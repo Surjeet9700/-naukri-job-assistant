@@ -1,0 +1,30 @@
+{
+  "name": "naukri-auto-apply-project",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "extension"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:extension\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:extension": "cd extension && npm run dev",
+    "build": "npm run build:backend && npm run build:extension",
+    "build:backend": "cd backend && npm run build",
+    "build:extension": "cd extension && npm run build",
+    "test": "jest",
+    "lint": "npm run lint:backend && npm run lint:extension",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:extension": "cd extension && npm run lint"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "concurrently": "^8.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "ts-jest": "^29.3.2",
+    "typescript": "^5.8.3",
+    "vite-plugin-static-copy": "^2.3.1"
+  }
+}
