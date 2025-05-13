@@ -1,11 +1,235 @@
 /// <reference types="chrome"/>
 
-import { answerApplicationQuestions, handleNaukriNoticePeriod, checkForFinalSaveButton, handleTechEducationQuestion } from './services/questionAnswering';
+// Import the functions we know exist
+import { checkForFinalSaveButton, handleTechEducationQuestion, handleNaukriChatbotFlow, findAndClickSaveButton, handleNaukriRadioSelection } from './services/questionAnswering';
 import { fillApplicationForm } from './services/formFilling';
 import { detectApplicationStatus, detectApplicationCompletionWithLLM, detectApplicationForm, detectApplicationCompletion } from './services/statusDetection';
 import { analyzePageContent } from './services/pageAnalyzer';
 import { UserProfile } from '../popup/types/profile';
 import { ApplicationStatus } from '../popup/types/job';
+
+// Define the missing exports from questionAnswering.ts
+// These will be matched by our type declarations
+async function answerApplicationQuestions(profile: UserProfile): Promise<boolean> {
+  try {
+    console.log('Starting application question answering process');
+    
+    // First check if this is a Naukri chatbot interface
+    const chatbotSelectors = [
+      '[id*="Drawer"][class*="chatbot"]', 
+      '.chatbot_Drawer', 
+      '.chatbot_DrawerContentWrapper', 
+      '[class*="DrawerContentWrapper"]',
+      // Add more specific selectors from the screenshot
+      '[id*="_9zis3xx9xInputBox"]',
+      '.chatbot_SendMessageContainer',
+      '[class*="chatbot_"]'
+    ];
+    
+    let isChatbot = false;
+    let matchedSelector = '';
+    
+    // Try each selector and log what we find
+    for (const selector of chatbotSelectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        isChatbot = true;
+        matchedSelector = selector;
+        console.log(`[CHAT] Found chatbot element with selector "${selector}":`, element);
+        break;
+      }
+    }
+    
+    // Special case check for notice period dialog
+    if (!isChatbot) {
+      const noticeElement = document.querySelector('[id*="SingleSelectRadioButton"], [id$="xSingleSelectRadioButton"]');
+      if (noticeElement) {
+        console.log('[CHAT] Detected notice period selection dialog:', noticeElement);
+        if (document.body.textContent?.includes('notice period')) {
+          console.log('[CHAT] Question appears to be about notice period');
+          return await handleNaukriNoticePeriod();
+        }
+      }
+    }
+    
+    if (isChatbot) {
+      console.log(`Detected Naukri chatbot interface with selector "${matchedSelector}", using specialized handler`);
+      return await handleNaukriChatbotFlow(profile);
+    }
+    
+    // If not chatbot, fall back to general form detection and filling
+    console.log('No chatbot detected, checking for standard form');
+    const form = await detectApplicationForm();
+    
+    if (form) {
+      console.log('Detected standard application form, filling it');
+      try {
+        await fillApplicationForm(profile);
+        return true; // If no exception was thrown, consider it successful
+      } catch (error) {
+        console.error('Error filling application form:', error);
+        return false;
+      }
+    }
+    
+    console.warn('Could not detect chatbot or form structure');
+    return false;
+  } catch (error) {
+    console.error('Error in answerApplicationQuestions:', error);
+    return false;
+  }
+}
+
+async function handleNaukriNoticePeriod(): Promise<boolean> {
+  try {
+    console.log('[NOTICE] Implementing Naukri notice period selection');
+    
+    // First look for the container that holds the notice period options
+    const radioContainer = document.querySelector('.singleselect-radiobutton-container, [id*="SingleSelectRadioButton"], [id$="SingleSelectRadioButton"]');
+    
+    if (!radioContainer) {
+      console.error('[NOTICE] Could not find notice period radio container, checking for alternative selectors');
+      
+      // Try the specific ID pattern from the screenshot
+      const specificContainer = document.querySelector('[id$="xSingleSelectRadioButton"], [id*="_9zis3xx9xSingleSelectRadioButton"]');
+      if (specificContainer) {
+        console.log('[NOTICE] Found radio container with specific ID pattern:', specificContainer);
+        const radioButtons = specificContainer.querySelectorAll('input[type="radio"]');
+        const radioLabels = specificContainer.querySelectorAll('label');
+        
+        console.log('[NOTICE] Found radio buttons:', radioButtons.length);
+        console.log('[NOTICE] Found radio labels:', radioLabels.length);
+        
+        // If we have radio buttons, select the first one (15 Days or less)
+        if (radioButtons.length > 0) {
+          const firstRadio = radioButtons[0] as HTMLInputElement;
+          firstRadio.checked = true;
+          firstRadio.click();
+          firstRadio.dispatchEvent(new Event('change', { bubbles: true }));
+          
+          // Also try clicking the label if available
+          if (radioLabels.length > 0) {
+            (radioLabels[0] as HTMLElement).click();
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Find and click the save button
+          await findAndClickSaveButton();
+          
+          return true;
+        }
+        
+        return false;
+      }
+      
+      return false;
+    }
+    
+    console.log('[NOTICE] Found radio container:', radioContainer);
+    
+    // Get all radio buttons in the container
+    const radioButtons = radioContainer.querySelectorAll('input[type="radio"]');
+    const radioLabels = radioContainer.querySelectorAll('.ssrc__label, label');
+    
+    console.log('[NOTICE] Found radio buttons:', radioButtons.length);
+    console.log('[NOTICE] Found radio labels:', radioLabels.length);
+    
+    // Debug log all radio buttons and their values
+    radioButtons.forEach((radio, index) => {
+      const input = radio as HTMLInputElement;
+      console.log(`[NOTICE] Radio button #${index}:`, {
+        id: input.id,
+        value: input.value,
+        checked: input.checked,
+        label: document.querySelector(`label[for="${input.id}"]`)?.textContent
+      });
+    });
+    
+    // Get the "15 Days or less" option
+    const shortestNoticeOption = Array.from(radioButtons).find(radio => {
+      const input = radio as HTMLInputElement;
+      const id = input.id;
+      const value = input.value;
+      const labelText = document.querySelector(`label[for="${id}"]`)?.textContent || '';
+      
+      return value === '15 Days or less' || 
+             id === '15 Days or less' || 
+             labelText.includes('15 Days') || 
+             labelText.includes('15 days') ||
+             (id.toLowerCase().includes('radio') && parseInt(id.replace(/\D/g, '')) === 0);
+    }) as HTMLInputElement | undefined;
+    
+    // If we found the option directly
+    if (shortestNoticeOption) {
+      console.log('[NOTICE] Found "15 Days or less" option directly');
+      
+      // Select the radio button
+      shortestNoticeOption.checked = true;
+      shortestNoticeOption.click();
+      shortestNoticeOption.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      // Also try clicking the label for additional reliability
+      const label = document.querySelector(`label[for="${shortestNoticeOption.id}"]`);
+      if (label) {
+        (label as HTMLElement).click();
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Find and click the save/submit button
+      await findAndClickSaveButton();
+      
+      return true;
+    }
+    
+    // If the direct approach fails, try finding by index or label text
+    const radioContainers = radioContainer.querySelectorAll('.ssrc__radio-btn-container');
+    
+    console.log('[NOTICE] Found radio containers:', radioContainers.length);
+    
+    // Try the first option (usually the shortest notice period)
+    if (radioContainers.length > 0) {
+      console.log('[NOTICE] Selecting first radio option (shortest notice period)');
+      
+      const firstRadio = radioContainers[0].querySelector('input[type="radio"]') as HTMLInputElement;
+      if (firstRadio) {
+        firstRadio.checked = true;
+        firstRadio.click();
+        firstRadio.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        // Also click the label
+        const label = radioContainers[0].querySelector('label');
+        if (label) {
+          (label as HTMLElement).click();
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Find and click the save/submit button
+        await findAndClickSaveButton();
+        
+        return true;
+      }
+    }
+    
+    // Final attempt: use the radio selection helper function from questionAnswering
+    // Get options as strings for the helper function
+    const options = Array.from(radioLabels).map(label => label.textContent || '');
+    
+    // Select the first option (shortest notice period)
+    if (options.length > 0) {
+      console.log('[NOTICE] Using radio selection helper with options:', options);
+      return await handleNaukriRadioSelection(0, [], options);
+    }
+    
+    console.warn('[NOTICE] Could not find or select any notice period options');
+    return false;
+  } catch (error) {
+    console.error('[NOTICE] Error handling Naukri notice period:', error);
+    return false;
+  }
+}
 
 interface AutomationData {
   jobId: string;
@@ -72,12 +296,24 @@ async function startNaukriAutomation(jobId: string, profile: UserProfile): Promi
   automationRunning = true;
   
   try {
-    console.log("Testing logs from here")
-    console.log('Starting Naukri automation for job:', jobId);
+    console.log("Starting Naukri automation for job:", jobId);
+    
+    // Update UI with starting status
+    chrome.runtime.sendMessage({
+      action: 'automationStatus',
+      data: {
+        state: ApplicationStatus.IN_PROGRESS,
+        jobId,
+        message: 'Starting application process...'
+      }
+    });
     
     // First check if already applied
     const initialStatus = detectApplicationStatus();
+    console.log('[AUTOMATION] Initial status detection:', initialStatus);
+    
     if (initialStatus === 'applied' || initialStatus === 'already_applied') {
+      console.log('[AUTOMATION] Job already applied, updating status');
       // Notify that job was already applied
       chrome.runtime.sendMessage({
         action: 'automationStatus',
@@ -93,19 +329,61 @@ async function startNaukriAutomation(jobId: string, profile: UserProfile): Promi
     // Wait for page to be fully loaded and stable
     await waitForPageStability();
     
+    // Update UI with progress
+    chrome.runtime.sendMessage({
+      action: 'automationStatus',
+      data: {
+        state: ApplicationStatus.IN_PROGRESS,
+        jobId,
+        message: 'Page loaded, beginning application process...'
+      }
+    });
+    
     // Check if we have a form or chatbot
     let chatbotContainer = document.querySelector('[id$="ChatbotContainer"], [id*="chatbot_Drawer"], .chatbot-container');
     let applicationForm = document.querySelector('.application-form');
     console.log('[AUTOMATION] Initial chatbotContainer:', !!chatbotContainer, 'applicationForm:', !!applicationForm);
     if (chatbotContainer) {
       console.log('[AUTOMATION] Chatbot mode detected, skipping Apply button logic.');
+      
+      // Update UI with progress
+      chrome.runtime.sendMessage({
+        action: 'automationStatus',
+        data: {
+          state: ApplicationStatus.IN_PROGRESS,
+          jobId,
+          message: 'Detected chatbot interview, starting to answer questions...'
+        }
+      });
+      
       await startApplicationQuestionAnswering(profile);
     } else if (applicationForm) {
+      // Update UI
+      chrome.runtime.sendMessage({
+        action: 'automationStatus',
+        data: {
+          state: ApplicationStatus.IN_PROGRESS,
+          jobId,
+          message: 'Detected application form, filling out details...'
+        }
+      });
+      
       await fillApplicationForm(profile);
     } else {
       // Wait up to 15 seconds for chatbot or form to appear before trying Apply
       let chatbotAppeared = false;
       let formAppeared = false;
+      
+      // Update UI
+      chrome.runtime.sendMessage({
+        action: 'automationStatus',
+        data: {
+          state: ApplicationStatus.IN_PROGRESS,
+          jobId,
+          message: 'Looking for application form or chatbot...'
+        }
+      });
+      
       for (let i = 0; i < 30; i++) { // 30 checks, 500ms each = 15s
         chatbotContainer = document.querySelector('[id$="ChatbotContainer"], [id*="chatbot_Drawer"], .chatbot-container');
         applicationForm = document.querySelector('.application-form');
@@ -122,8 +400,29 @@ async function startNaukriAutomation(jobId: string, profile: UserProfile): Promi
       console.log('[AUTOMATION] After waiting: chatbotAppeared:', chatbotAppeared, 'formAppeared:', formAppeared);
       if (chatbotAppeared) {
         console.log('[AUTOMATION] Chatbot appeared before Apply, skipping Apply button logic.');
+        
+        // Update UI with progress
+        chrome.runtime.sendMessage({
+          action: 'automationStatus',
+          data: {
+            state: ApplicationStatus.IN_PROGRESS,
+            jobId,
+            message: 'Found chatbot interview, starting to answer questions...'
+          }
+        });
+        
         await startApplicationQuestionAnswering(profile);
       } else if (formAppeared) {
+        // Update UI
+        chrome.runtime.sendMessage({
+          action: 'automationStatus',
+          data: {
+            state: ApplicationStatus.IN_PROGRESS,
+            jobId,
+            message: 'Found application form, filling out details...'
+          }
+        });
+        
         await fillApplicationForm(profile);
       } else {
         // Final check for chatbot/form before clicking Apply
@@ -131,25 +430,77 @@ async function startNaukriAutomation(jobId: string, profile: UserProfile): Promi
         applicationForm = document.querySelector('.application-form');
         if (chatbotContainer || applicationForm) {
           console.log('[AUTOMATION] Chatbot or form appeared at last moment, skipping Apply button logic.');
+          
+          // Update UI
+          chrome.runtime.sendMessage({
+            action: 'automationStatus',
+            data: {
+              state: ApplicationStatus.IN_PROGRESS,
+              jobId,
+              message: chatbotContainer ? 'Starting chatbot interview...' : 'Filling application form...'
+            }
+          });
+          
           if (chatbotContainer) {
             await startApplicationQuestionAnswering(profile);
           } else {
             await fillApplicationForm(profile);
           }
         } else {
+          // Update UI
+          chrome.runtime.sendMessage({
+            action: 'automationStatus',
+            data: {
+              state: ApplicationStatus.IN_PROGRESS,
+              jobId,
+              message: 'Looking for Apply button...'
+            }
+          });
+          
           // Try to click Apply button
           const applySuccess = await clickApplyButtonWithDebug();
           if (!applySuccess) {
             throw new Error('Could not find or click Apply button');
           }
+          
+          // Update UI
+          chrome.runtime.sendMessage({
+            action: 'automationStatus',
+            data: {
+              state: ApplicationStatus.IN_PROGRESS,
+              jobId,
+              message: 'Apply button clicked, waiting for form to appear...'
+            }
+          });
+          
           // Wait for application form or chatbot to appear
           await waitForElement('[id$="ChatbotContainer"], .application-form');
           // Re-check for form or chatbot
           chatbotContainer = document.querySelector('[id$="ChatbotContainer"], [id*="chatbot_Drawer"], .chatbot-container');
           applicationForm = document.querySelector('.application-form');
           if (applicationForm) {
+            // Update UI
+            chrome.runtime.sendMessage({
+              action: 'automationStatus',
+              data: {
+                state: ApplicationStatus.IN_PROGRESS,
+                jobId,
+                message: 'Filling out application form...'
+              }
+            });
+            
             await fillApplicationForm(profile);
           } else if (chatbotContainer) {
+            // Update UI
+            chrome.runtime.sendMessage({
+              action: 'automationStatus',
+              data: {
+                state: ApplicationStatus.IN_PROGRESS,
+                jobId,
+                message: 'Starting chatbot interview process...'
+              }
+            });
+            
             await startApplicationQuestionAnswering(profile);
           } else {
             throw new Error('Could not find application form or chatbot');
@@ -163,9 +514,13 @@ async function startNaukriAutomation(jobId: string, profile: UserProfile): Promi
     
     // Final check of application status using traditional methods
     const finalStatus = detectApplicationStatus();
+    console.log('[AUTOMATION] Final status detection:', finalStatus);
+    
     if (finalStatus === 'applied' || finalStatus === 'already_applied') {
       // If traditional detection finds success, report it immediately
       stopCompletionDetection();
+      
+      console.log('[AUTOMATION] Application successful, setting status to APPLIED');
       
       // Notify background script of completion
       chrome.runtime.sendMessage({
@@ -176,6 +531,18 @@ async function startNaukriAutomation(jobId: string, profile: UserProfile): Promi
           message: 'Application successfully submitted'
         }
       });
+      
+      // Double-check message was sent by sending again after a short delay
+      setTimeout(() => {
+        chrome.runtime.sendMessage({
+          action: 'automationStatus',
+          data: {
+            state: ApplicationStatus.APPLIED,
+            jobId,
+            message: 'Application successfully submitted (confirmation)'
+          }
+        });
+      }, 1000);
     } else {
       // If traditional detection doesn't find success, notify that we're waiting for confirmation
       chrome.runtime.sendMessage({
@@ -192,6 +559,16 @@ async function startNaukriAutomation(jobId: string, profile: UserProfile): Promi
         if (completionCheckInterval) {
           stopCompletionDetection();
           console.log('Stopped completion detection after timeout');
+          
+          // Send final status update
+          chrome.runtime.sendMessage({
+            action: 'automationStatus',
+            data: {
+              state: ApplicationStatus.UNKNOWN,
+              jobId,
+              message: 'Application process timed out, please check manually'
+            }
+          });
         }
       }, 5 * 60 * 1000); // 5 minutes
     }
@@ -209,6 +586,19 @@ async function startNaukriAutomation(jobId: string, profile: UserProfile): Promi
         code: automationError.code
       }
     });
+    
+    // Double check message was sent
+    setTimeout(() => {
+      chrome.runtime.sendMessage({
+        action: 'automationStatus',
+        data: {
+          state: ApplicationStatus.FAILED,
+          jobId,
+          message: `Error: ${automationError.message || 'Application process failed'}`,
+          code: automationError.code
+        }
+      });
+    }, 1000);
   } finally {
     automationRunning = false;
   }
@@ -411,9 +801,17 @@ async function waitForPageStability(timeout = 5000): Promise<void> {
       return originalFetch.apply(this, args);
     };
     
-    XMLHttpRequest.prototype.open = function(...args) {
+    // Create a safer override that matches the signature exactly
+    XMLHttpRequest.prototype.open = function(
+      method: string, 
+      url: string | URL, 
+      async: boolean = true, 
+      username?: string | null, 
+      password?: string | null
+    ) {
       lastNetworkActivity.timestamp = Date.now();
-      return originalXHR.apply(this, args);
+      // Use Function.prototype.call to avoid the type errors with .apply() and the arguments
+      return originalXHR.call(this, method, url, async, username as string, password as string);
     };
     
     // Set timeout

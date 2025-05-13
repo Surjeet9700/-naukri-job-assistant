@@ -9,7 +9,7 @@ export default defineConfig({
     emptyOutDir: false,
     rollupOptions: {
       input: {
-        popup: resolve(__dirname, 'popup.html')
+        popup: resolve(__dirname, 'popup.html'),
       },
       output: {
         entryFileNames: '[name].js',
@@ -20,7 +20,15 @@ export default defineConfig({
           }
           return 'assets/[name].[hash][extname]';
         }
-      }
+      },
+      external: [
+        'pdfjs-dist/build/pdf.worker.entry'
+      ]
     }
-  }
+  },
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
+    },
+  },
 });

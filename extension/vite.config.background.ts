@@ -9,12 +9,20 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: false,
     rollupOptions: {
-      input: resolve(__dirname, 'src/background/background.ts'),
+      input: {
+        background: resolve(__dirname, 'src/background/background.ts'),
+      },
       output: {
         entryFileNames: 'background.js',
-        format: 'iife',
-        extend: true
-      }
-    }
-  }
+      },
+      external: [
+        'pdfjs-dist/build/pdf.worker.entry'
+      ]
+    },
+  },
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
+    },
+  },
 });

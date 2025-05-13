@@ -13,14 +13,19 @@ export default defineConfig({
     emptyOutDir: false,
     rollupOptions: {
       input: {
-        content: resolve(__dirname, 'src/content/content.ts')
+        content: resolve(__dirname, 'src/content/content.ts'),
       },
       output: {
-        entryFileNames: '[name].js',
-        format: 'iife',
-        extend: true,
-        inlineDynamicImports: false
-      }
-    }
-  }
+        entryFileNames: 'content.js',
+      },
+      external: [
+        'pdfjs-dist/build/pdf.worker.entry'
+      ]
+    },
+  },
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
+    },
+  },
 });

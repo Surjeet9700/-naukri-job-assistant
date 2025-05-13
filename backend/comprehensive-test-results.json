@@ -1,0 +1,219 @@
+{
+  "total": 16,
+  "passed": 16,
+  "failed": 0,
+  "details": [
+    {
+      "name": "Simple disability percentage",
+      "question": "What is your Disability Percentage?",
+      "validatePassed": true,
+      "handlerPassed": null,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "0%"
+      },
+      "handlerResult": null
+    },
+    {
+      "name": "Disability percentage with different phrasing",
+      "question": "Disability percentage?",
+      "validatePassed": true,
+      "handlerPassed": null,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "0%"
+      },
+      "handlerResult": null
+    },
+    {
+      "name": "Disability percentage with percentage symbol",
+      "question": "Please enter your disability %",
+      "validatePassed": true,
+      "handlerPassed": null,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "0%"
+      },
+      "handlerResult": null
+    },
+    {
+      "name": "Differently phrased disability percentage",
+      "question": "If you are a person with disability, what is the percentage?",
+      "validatePassed": true,
+      "handlerPassed": null,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "0%"
+      },
+      "handlerResult": null
+    },
+    {
+      "name": "Simple yes/no disability question",
+      "question": "Do you have any disabilities?",
+      "validatePassed": true,
+      "handlerPassed": true,
+      "validateResult": {
+        "actionType": "select",
+        "actionValue": "Yes"
+      },
+      "handlerResult": {
+        "success": true,
+        "answer": "No",
+        "actionType": "select"
+      }
+    },
+    {
+      "name": "Differently phrased yes/no disability question",
+      "question": "Are you a differently-abled person?",
+      "validatePassed": true,
+      "handlerPassed": true,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "Default response"
+      },
+      "handlerResult": {
+        "success": true,
+        "answer": "No",
+        "actionType": "select"
+      }
+    },
+    {
+      "name": "Differently phrased yes/no disability question (2)",
+      "question": "Do you have any physical disabilities?",
+      "validatePassed": true,
+      "handlerPassed": true,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "Default response"
+      },
+      "handlerResult": {
+        "success": true,
+        "answer": "No",
+        "actionType": "select"
+      }
+    },
+    {
+      "name": "Yes/no with additional options",
+      "question": "Do you have any disabilities?",
+      "validatePassed": true,
+      "handlerPassed": true,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "Default response"
+      },
+      "handlerResult": {
+        "success": true,
+        "answer": "No",
+        "actionType": "select"
+      }
+    },
+    {
+      "name": "Multiple choice with \"None\" option",
+      "question": "Select your disability type",
+      "validatePassed": true,
+      "handlerPassed": true,
+      "validateResult": {
+        "actionType": "select",
+        "actionValue": "Visual"
+      },
+      "handlerResult": {
+        "success": true,
+        "answer": "None",
+        "actionType": "select"
+      }
+    },
+    {
+      "name": "Multiple choice without \"None\" option",
+      "question": "Select your disability category",
+      "validatePassed": true,
+      "handlerPassed": true,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "Default response"
+      },
+      "handlerResult": {
+        "success": true,
+        "answer": "Category A",
+        "actionType": "select"
+      }
+    },
+    {
+      "name": "Multiple choice with percentage ranges",
+      "question": "Select your disability percentage range",
+      "validatePassed": true,
+      "handlerPassed": true,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "0%"
+      },
+      "handlerResult": {
+        "success": true,
+        "answer": "0%",
+        "actionType": "select"
+      }
+    },
+    {
+      "name": "General disability description",
+      "question": "Please describe your disability, if any",
+      "validatePassed": true,
+      "handlerPassed": true,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "Default response"
+      },
+      "handlerResult": {
+        "success": true,
+        "answer": "I do not have any disabilities that would affect my ability to perform the job duties.",
+        "actionType": "type"
+      }
+    },
+    {
+      "name": "Disability accommodations",
+      "question": "What accommodations do you need for your disability?",
+      "validatePassed": true,
+      "handlerPassed": true,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "Default response"
+      },
+      "handlerResult": {
+        "success": true,
+        "answer": "I do not have any disabilities that would affect my ability to perform the job duties.",
+        "actionType": "type"
+      }
+    },
+    {
+      "name": "Empty action with disability percentage question",
+      "question": "What is your Disability Percentage?",
+      "validatePassed": true,
+      "handlerPassed": null,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "0%"
+      },
+      "handlerResult": null
+    },
+    {
+      "name": "Invalid action type with disability question",
+      "question": "Do you have any disabilities?",
+      "validatePassed": true,
+      "handlerPassed": null,
+      "validateResult": {
+        "actionType": "type",
+        "actionValue": "Some value"
+      },
+      "handlerResult": null
+    },
+    {
+      "name": "Empty action value with select type",
+      "question": "Select your disability status",
+      "validatePassed": true,
+      "handlerPassed": null,
+      "validateResult": {
+        "actionType": "select",
+        "actionValue": "Category A"
+      },
+      "handlerResult": null
+    }
+  ]
+}

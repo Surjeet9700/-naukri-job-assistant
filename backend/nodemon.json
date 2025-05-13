@@ -1,0 +1,19 @@
+{
+  "verbose": true,
+  "ignore": [
+    "logs/*",
+    "logs/*.json",
+    "logs/*.log",
+    "*.test.js",
+    "node_modules/*",
+    ".git",
+    "test-results.txt",
+    "advanced-test-results.txt",
+    "comprehensive-test-results.json"
+  ],
+  "watch": [
+    "src"
+  ],
+  "ext": "js,json",
+  "delay": "1000"
+} 

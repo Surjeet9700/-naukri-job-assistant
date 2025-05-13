@@ -24,12 +24,25 @@ const JobList: React.FC<JobListProps> = ({
   const [filteredJobs, setFilteredJobs] = React.useState<Job[]>(jobs);
 
   React.useEffect(() => {
+    // Sort jobs by matchScore first (highest score first), then filter by search term
+    const sortedJobs = [...jobs].sort((a, b) => {
+      // If both have matchScore, sort by score (highest first)
+      if (a.matchScore && b.matchScore) {
+        return b.matchScore - a.matchScore;
+      }
+      // If only one has matchScore, prioritize the one with matchScore
+      if (a.matchScore) return -1;
+      if (b.matchScore) return 1;
+      // Default sorting by job title if no matchScore
+      return a.title.localeCompare(b.title);
+    });
+
     if (searchTerm.trim() === '') {
-      setFilteredJobs(jobs);
+      setFilteredJobs(sortedJobs);
     } else {
       const lowercasedSearch = searchTerm.toLowerCase();
       setFilteredJobs(
-        jobs.filter(job => 
+        sortedJobs.filter(job => 
           job.title.toLowerCase().includes(lowercasedSearch) ||
           job.company.toLowerCase().includes(lowercasedSearch) ||
           job.skills.some(skill => skill.toLowerCase().includes(lowercasedSearch))

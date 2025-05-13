@@ -1,0 +1,22 @@
+{
+  "typescript.tsserver.experimental.useVsCodeWatcher": false,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  // When renaming or deleting files, restart the TS server to eliminate phantom errors
+  "auto-run-command.rules": [
+    {
+      "event": "onFileRename",
+      "command": "typescript.restartTsServer"
+    },
+    {
+      "event": "onFileDelete",
+      "command": "typescript.restartTsServer"
+    }
+  ],
+  // Use local project TypeScript version
+  "typescript.disableAutomaticTypeAcquisition": false,
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.updateImportsOnFileMove.enabled": "always"
+} 

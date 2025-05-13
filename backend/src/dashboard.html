@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Response Dashboard</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f7f9fc;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    header {
+      background-color: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    h1, h2, h3 {
+      color: #2c3e50;
+    }
+    
+    .card {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    
+    .stat-card {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+      text-align: center;
+    }
+    
+    .stat-card h3 {
+      margin-top: 0;
+      font-size: 1rem;
+      color: #718096;
+    }
+    
+    .stat-card .value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #4299e1;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    table th, table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    table th {
+      background-color: #f8fafc;
+      font-weight: 600;
+    }
+    
+    .logs-list tbody tr:hover {
+      background-color: #f3f4f6;
+      cursor: pointer;
+    }
+    
+    .btn {
+      background-color: #4299e1;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    
+    .btn:hover {
+      background-color: #3182ce;
+    }
+    
+    .log-details {
+      display: none;
+      background-color: #f1f5f9;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 500px;
+    }
+    
+    .chart-container {
+      height: 300px;
+      margin-bottom: 2rem;
+    }
+    
+    .accuracy-meter {
+      width: 100%;
+      height: 30px;
+      background-color: #edf2f7;
+      border-radius: 15px;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+    
+    .accuracy-fill {
+      height: 100%;
+      background-color: #48bb78;
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>LLM Response Dashboard</h1>
+      <p>Monitor and analyze LLM responses for job application automation</p>
+    </div>
+  </header>
+  
+  <div class="container">
+    <div class="card">
+      <h2>Response Statistics</h2>
+      <div class="accuracy-meter">
+        <div class="accuracy-fill" id="accuracy-fill" style="width: 0%">0%</div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>Total Interactions</h3>
+          <div class="value" id="total-interactions">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>LLM Responses</h3>
+          <div class="value" id="llm-responses">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Fallback Responses</h3>
+          <div class="value" id="fallback-responses">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Specialized Handlers</h3>
+          <div class="value" id="specialized-responses">0</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Question Categories</h2>
+      <div id="question-categories-chart" class="chart-container"></div>
+    </div>
+    
+    <div class="card">
+      <h2>Recent Interactions</h2>
+      <table class="logs-list">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Question</th>
+            <th>Response Type</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="logs-table-body">
+          <!-- Logs will be loaded here -->
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="card">
+      <h2>Log Details</h2>
+      <div id="log-details" class="log-details">
+        Select a log to view details
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Fetch and display logs
+    async function fetchLogs() {
+      try {
+        const logsTableBody = document.getElementById('logs-table-body');
+        
+        // Show loading indicator
+        logsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">Loading logs...</td></tr>`;
+        
+        // Step 1: Get the list of log files
+        const response = await fetch('/api/logs');
+        const data = await response.json();
+        
+        if (!data.success) {
+          console.error('Failed to fetch logs:', data.error);
+          logsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">Failed to load logs</td></tr>`;
+          return;
+        }
+        
+        logsTableBody.innerHTML = '';
+        
+        if (data.logs.length === 0) {
+          logsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">No logs found</td></tr>`;
+          return;
+        }
+        
+        // Only process the 10 most recent logs to avoid performance issues
+        const recentLogs = data.logs.slice(0, 10);
+        const filenames = recentLogs.map(log => log.filename);
+        
+        // Step 2: Fetch log contents in a single batch request
+        const batchResponse = await fetch('/api/logs/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ filenames })
+        });
+        
+        const batchData = await batchResponse.json();
+        
+        if (!batchData.success) {
+          console.error('Failed to fetch log details:', batchData.error);
+          logsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">Failed to load log details</td></tr>`;
+          return;
+        }
+        
+        // Step 3: Process and display logs
+        recentLogs.forEach(log => {
+          const logContent = batchData.logs[log.filename];
+          
+          if (!logContent) {
+            console.warn(`No content found for log: ${log.filename}`);
+            return;
+          }
+          
+          const question = logContent.question || 'Unknown';
+          // Limit question length to 50 characters to avoid table overflow
+          const displayQuestion = question.length > 50 ? question.substring(0, 47) + '...' : question;
+          const responseType = (logContent.response && logContent.response.type) ? logContent.response.type : '-';
+          
+          // Format the date safely
+          let dateStr = 'Unknown Date';
+          try {
+            const date = new Date(log.created);
+            if (!isNaN(date.getTime())) {
+              dateStr = date.toLocaleString();
+            } else {
+              // Fallback to extracting date from filename
+              const dateMatch = log.filename.match(/llm-interaction-(\d{4}-\d{2}-\d{2})/);
+              if (dateMatch) {
+                dateStr = dateMatch[1];
+              }
+            }
+          } catch (e) {
+            console.warn('Error formatting date:', e);
+          }
+          
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${dateStr}</td>
+            <td title="${question}">${displayQuestion}</td>
+            <td>${responseType}</td>
+            <td>
+              <button class="btn view-log-btn" data-filename="${log.filename}">View</button>
+            </td>
+          `;
+          logsTableBody.appendChild(row);
+        });
+        
+        // Add event listeners for view buttons
+        document.querySelectorAll('.view-log-btn').forEach(btn => {
+          btn.addEventListener('click', () => viewLogDetails(btn.dataset.filename));
+        });
+      } catch (error) {
+        console.error('Error fetching logs:', error);
+        const logsTableBody = document.getElementById('logs-table-body');
+        logsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">Error loading logs: ${error.message}</td></tr>`;
+      }
+    }
+    
+    // Fetch and display stats
+    async function fetchStats() {
+      try {
+        const response = await fetch('/api/logs/dashboard/stats');
+        const data = await response.json();
+        
+        if (!data.success) {
+          console.error('Failed to fetch stats:', data.error);
+          return;
+        }
+        
+        const stats = data.stats;
+        
+        // Update stats cards
+        document.getElementById('total-interactions').textContent = stats.totalLogs || 0;
+        document.getElementById('llm-responses').textContent = stats.responseTypes?.llm || 0;
+        document.getElementById('fallback-responses').textContent = stats.responseTypes?.fallback || 0;
+        document.getElementById('specialized-responses').textContent = 
+          (stats.responseTypes?.specialized || 0) + (stats.responseTypes?.direct || 0);
+        
+        // Update accuracy meter
+        const accuracyFill = document.getElementById('accuracy-fill');
+        const accuracy = parseFloat(stats.accuracy) || 0;
+        accuracyFill.style.width = `${accuracy}%`;
+        accuracyFill.textContent = `${accuracy}% Accuracy`;
+        
+        // Update question categories chart if we have chart.js
+        // This is a placeholder - in a real implementation you would use a charting library
+        const categoriesContainer = document.getElementById('question-categories-chart');
+        if (stats.questionCategories) {
+          let categoriesHtml = '<div style="display: flex; height: 100%;">';
+          
+          Object.entries(stats.questionCategories).forEach(([category, count]) => {
+            const percentage = (count / stats.totalLogs * 100).toFixed(1);
+            const color = getRandomColor();
+            
+            categoriesHtml += `
+              <div style="flex: ${percentage}; background-color: ${color}; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;">
+                <div>${category}</div>
+                <div style="font-size: 1.5rem; font-weight: bold;">${count}</div>
+                <div>${percentage}%</div>
+              </div>
+            `;
+          });
+          
+          categoriesHtml += '</div>';
+          categoriesContainer.innerHTML = categoriesHtml;
+        } else {
+          categoriesContainer.innerHTML = '<p>No category data available</p>';
+        }
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      }
+    }
+    
+    // View log details
+    async function viewLogDetails(filename) {
+      try {
+        const response = await fetch(`/api/logs/${filename}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          console.error('Failed to fetch log details:', data.error);
+          return;
+        }
+        
+        const logDetails = document.getElementById('log-details');
+        logDetails.style.display = 'block';
+        
+        // Format and display log data
+        const formattedLog = JSON.stringify(data.log, null, 2);
+        logDetails.innerHTML = `<pre>${formattedLog}</pre>`;
+        
+        // Scroll to log details
+        logDetails.scrollIntoView({ behavior: 'smooth' });
+      } catch (error) {
+        console.error('Error fetching log details:', error);
+      }
+    }
+    
+    // Helper function to extract info from filename
+    function getFilenameInfo(filename) {
+      // Format: llm-interaction-YYYY-MM-DDTHH-MM-SS.SSSZ.json
+      const match = filename.match(/llm-interaction-(.*?)\.json/);
+      if (match && match[1]) {
+        try {
+          // Convert the filename format to a proper ISO date string
+          // Replace only the dashes that separate time components with colons
+          const isoTimestamp = match[1].replace(/(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})\.(\d{3})Z/, '$1T$2:$3:$4.$5Z');
+          const date = new Date(isoTimestamp);
+          
+          // Check if the date is valid
+          if (!isNaN(date.getTime())) {
+            return date.toLocaleString();
+          }
+        } catch (e) {
+          console.error('Error parsing date:', e);
+        }
+      }
+      
+      // Return a simplified timestamp or the original filename if date parsing fails
+      const simplifiedMatch = filename.match(/(\d{4}-\d{2}-\d{2})/);
+      return simplifiedMatch ? simplifiedMatch[1] : filename;
+    }
+    
+    // Helper function to generate random color
+    function getRandomColor() {
+      const colors = [
+        '#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#f56565',
+        '#38b2ac', '#d69e2e', '#667eea', '#fc8181', '#68d391'
+      ];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+    
+    // Initialize dashboard
+    function init() {
+      fetchLogs();
+      fetchStats();
+      
+      // Refresh every 30 seconds
+      setInterval(() => {
+        fetchLogs();
+        fetchStats();
+      }, 30000);
+    }
+    
+    // Start the dashboard when page loads
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html> 

@@ -1,14 +1,16 @@
 const { MongoClient } = require('mongodb');
+require('dotenv').config();
 
 // MongoDB connection string
 const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/naukri_apply_assist';
 
 // Database Name
-const dbName = process.env.DB_NAME || 'naukri_apply_assist';
+const dbName = process.env.MONGODB_DB_NAME || 'naukri_jobs_db';
 
 // Create a new MongoClient
 const client = new MongoClient(uri);
 
+// Global database connection
 let db;
 
 /**

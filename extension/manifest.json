@@ -5,7 +5,7 @@
   "description": "Automate job applications on Naukri.com with AI assistance",
   "permissions": [
     "storage",
-  "tabs",
+    "tabs",
     "activeTab",
     "scripting"
   ],
@@ -19,7 +19,8 @@
     "default_height": 600
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {

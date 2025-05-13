@@ -2,11 +2,20 @@
  * Detects the current application status on the Naukri job page
  */
 export function detectApplicationStatus(): 'not_started' | 'in_progress' | 'applied' | 'already_applied' | 'failed' {
+  console.log('[STATUS] Checking application status');
+  
+  // Debug: Dump all potential applied indicators
+  dumpPotentialAppliedIndicators();
+  
   // First check for the "Applied" button or success message
   const appliedIndicators = [
     // Direct button text matches
-    'button:contains("Applied")',
-    'a:contains("Applied")',
+    'button',
+    'a',
+    // Naukri-specific applied indicators
+    'button.applied',
+    '.apply-status-text',
+    'div.applied',
     // Success messages
     '.success-message',
     '.confirmation-message',
@@ -17,12 +26,101 @@ export function detectApplicationStatus(): 'not_started' | 'in_progress' | 'appl
     '.applied-success',
     '.applied-text',
     // Text content matches
-    'div:contains("Application Submitted Successfully")',
-    'div:contains("You have already applied")',
-    'div:contains("Thank you for applying")',
-    '.applied-status-text'
+    'div',
+    '.applied-status-text',
+    // Direct button or element matches
+    '[title="Applied"]',
+    '[aria-label="Applied"]',
+    'span',
+    // Additional Naukri success indicators
+    '.success-dialog',
+    '.success-status',
+    '.application-submitted',
+    '.applied-checkmark',
+    '.applied-icon',
+    '.confirmation-screen',
+    '.thank-you-screen',
+    '.success-confirmation',
+    '.confirmation-check',
+    // Additional specific classes for the Naukri.com UI
+    '.already-applied',
+    '.styles_already-applied__4KDhw',
+    'span.already-applied',
+    'span#already-applied',
+    '#already-applied'
   ];
 
+  // First, explicitly check for any button with text "Applied" instead of "Apply"
+  const applyButtons = document.querySelectorAll('button, a');
+  for (const button of applyButtons) {
+    const buttonText = button.textContent?.trim().toLowerCase() || '';
+    if (buttonText === 'applied') {
+      console.log('[STATUS] Found direct "Applied" button:', button);
+      return 'already_applied';
+    }
+  }
+  
+  // Direct search for the Applied button structure from the screenshot
+  const appliedSpans = document.querySelectorAll('span#already-applied, .already-applied, .styles_already-applied__4KDhw');
+  for (const span of appliedSpans) {
+    const isVisible = isElementVisible(span);
+    if (isVisible) {
+      console.log('[STATUS] Found direct Applied span match:', span);
+      return 'already_applied';
+    }
+  }
+  
+  // Also check for any container with a child that contains "already-applied"
+  const containerSelectors = [
+    '.styles_jhc__apply-button-container__5Bqnb',
+    '[class*="apply-button-container"]',
+    '[class*="button-container"]'
+  ];
+  
+  for (const selector of containerSelectors) {
+    const containers = document.querySelectorAll(selector);
+    for (const container of containers) {
+      const appliedChild = container.querySelector('.already-applied, #already-applied, [class*="already-applied"]');
+      if (appliedChild && isElementVisible(appliedChild)) {
+        console.log('[STATUS] Found applied indicator in container:', container, 'child:', appliedChild);
+        return 'already_applied';
+      }
+      
+      // Also check for "Applied" text content without the class
+      const text = container.textContent?.toLowerCase() || '';
+      if (text.includes('applied') && !text.includes('apply')) {
+        console.log('[STATUS] Found container with "applied" text:', container);
+        return 'already_applied';
+      }
+    }
+  }
+
+  // Specific check for the Naukri "Applied" indication with the styles_already-applied class
+  const naukriAppliedElements = document.querySelectorAll('.styles_already-applied__4KDhw, #already-applied, .already-applied');
+  if (naukriAppliedElements.length > 0) {
+    for (const element of naukriAppliedElements) {
+      const style = window.getComputedStyle(element);
+      if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+        console.log('[STATUS] Found specific Naukri applied indicator:', element);
+        return 'already_applied';
+      }
+    }
+  }
+  
+  // Check for the specific button container with already-applied span
+  const applyButtonContainers = document.querySelectorAll('.styles_jhc__apply-button-container__5Bqnb, [class*="apply-button-container"]');
+  for (const container of applyButtonContainers) {
+    const appliedSpan = container.querySelector('.styles_already-applied__4KDhw, .already-applied, #already-applied');
+    if (appliedSpan) {
+      const style = window.getComputedStyle(appliedSpan);
+      if (style.display !== 'none' && style.visibility !== 'hidden') {
+        console.log('[STATUS] Found Naukri applied button container with applied span:', appliedSpan);
+        return 'already_applied';
+      }
+    }
+  }
+
+  // Check for specific indicators
   for (const selector of appliedIndicators) {
     try {
       const elements = document.querySelectorAll(selector);
@@ -32,11 +130,26 @@ export function detectApplicationStatus(): 'not_started' | 'in_progress' | 'appl
           text.includes('applied') ||
           text.includes('success') ||
           text.includes('thank you') ||
-          text.includes('submitted')
+          text.includes('submitted') ||
+          text.includes('already applied') ||
+          text.includes('application submitted') ||
+          text.includes('application sent') ||
+          text.includes('successfully applied')
         ) {
           // Check if the element is visible
           const style = window.getComputedStyle(element);
           if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+            console.log('[STATUS] Found applied indicator:', element, 'with text:', text);
+            
+            // Log more detailed information about the success element
+            console.log('[STATUS] Success element details:', {
+              tagName: element.tagName,
+              classes: element.className,
+              id: element.id,
+              text: element.textContent,
+              isVisible: (style.display !== 'none' && style.visibility !== 'hidden')
+            });
+            
             return element.textContent?.toLowerCase().includes('already') 
               ? 'already_applied' 
               : 'applied';
@@ -46,6 +159,29 @@ export function detectApplicationStatus(): 'not_started' | 'in_progress' | 'appl
     } catch (e) {
       // Ignore selector errors
       console.debug('Selector error:', e);
+    }
+  }
+
+  // Additional check: Look for any elements with classes or IDs containing 'applied' or 'success'
+  const appliedClassElements = document.querySelectorAll('[class*="applied" i], [class*="success" i], [id*="applied" i], [id*="success" i]');
+  for (const element of appliedClassElements) {
+    const style = window.getComputedStyle(element);
+    if (style.display !== 'none' && style.visibility !== 'hidden') {
+      console.log('[STATUS] Found element with applied/success class/id:', element);
+      
+      // Check if this is specifically an "already applied" indicator by inspecting the class name or text content
+      const classes = element.className.toString().toLowerCase();
+      const text = element.textContent?.toLowerCase() || '';
+      
+      if (classes.includes('already-applied') || 
+          text.includes('already applied') || 
+          text === 'applied' ||
+          classes.includes('styles_already-applied')) {
+        console.log('[STATUS] Element is specifically an "already applied" indicator');
+        return 'already_applied';
+      }
+      
+      return 'applied';
     }
   }
 
@@ -66,7 +202,14 @@ export function detectApplicationStatus(): 'not_started' | 'in_progress' | 'appl
     // Generic form with relevant fields
     'form input[name*="resume"]',
     'form input[name*="cv"]',
-    'form textarea[name*="cover"]'
+    'form textarea[name*="cover"]',
+    // Additional Naukri indicators
+    '.chatbot_Drawer',
+    '[id*="chatbot_Drawer"]',
+    '.application-step',
+    '.application-flow',
+    '.questionnaire',
+    '.question-panel'
   ];
 
   for (const selector of inProgressIndicators) {
@@ -75,6 +218,7 @@ export function detectApplicationStatus(): 'not_started' | 'in_progress' | 'appl
       if (element) {
         const style = window.getComputedStyle(element);
         if (style.display !== 'none' && style.visibility !== 'hidden') {
+          console.log('[STATUS] Found in_progress indicator:', selector);
           return 'in_progress';
         }
       }
@@ -100,6 +244,7 @@ export function detectApplicationStatus(): 'not_started' | 'in_progress' | 'appl
       if (element) {
         const style = window.getComputedStyle(element);
         if (style.display !== 'none' && style.visibility !== 'hidden') {
+          console.log('[STATUS] Found error indicator:', selector);
           return 'failed';
         }
       }
@@ -134,6 +279,7 @@ export function detectApplicationStatus(): 'not_started' | 'in_progress' | 'appl
             style.opacity !== '0' &&
             style.pointerEvents !== 'none'
           ) {
+            console.log('[STATUS] Found not_started indicator (apply button):', element);
             return 'not_started';
           }
         }
@@ -143,7 +289,32 @@ export function detectApplicationStatus(): 'not_started' | 'in_progress' | 'appl
     }
   }
 
+  // Even more specific check for the exact HTML structure from the example
+  const alreadyAppliedSpan = document.getElementById('already-applied');
+  if (alreadyAppliedSpan && alreadyAppliedSpan.classList.contains('styles_already-applied__4KDhw')) {
+    // Try to find the parent container
+    const container = alreadyAppliedSpan.closest('.styles_jhc__apply-button-container__5Bqnb');
+    if (container || alreadyAppliedSpan.parentElement) {
+      console.log('[STATUS] Found exact match for the provided HTML structure:', alreadyAppliedSpan);
+      return 'already_applied';
+    }
+  }
+  
+  // Check for any span with id "already-applied" regardless of its classes
+  if (alreadyAppliedSpan) {
+    console.log('[STATUS] Found #already-applied span:', alreadyAppliedSpan);
+    return 'already_applied';
+  }
+  
+  // Check specifically for elements with the exact classes from the example
+  const exactClassMatch = document.querySelector('.styles_already-applied__4KDhw.already-applied');
+  if (exactClassMatch) {
+    console.log('[STATUS] Found exact class match:', exactClassMatch);
+    return 'already_applied';
+  }
+
   // If no clear status detected, default to not started
+  console.log('[STATUS] No clear status detected, defaulting to not_started');
   return 'not_started';
 }
 
@@ -625,3 +796,76 @@ function safeClickSaveOrApplyButton(selector: string) {
 }
 
 import { isChatbotActive, findSmartSaveButton } from './uiUtils';
+
+/**
+ * Debug helper to dump all potential "Applied" indicators on the page
+ * This helps diagnose why status detection might be failing
+ */
+function dumpPotentialAppliedIndicators(): void {
+  console.log('[STATUS-DEBUG] Dumping all potential applied indicators on the page:');
+  
+  // Check for elements with "applied" in their class name
+  const appliedClassElements = document.querySelectorAll('[class*="applied" i]');
+  console.log(`[STATUS-DEBUG] Found ${appliedClassElements.length} elements with "applied" in class name`);
+  
+  appliedClassElements.forEach((element, index) => {
+    const isVisible = isElementVisible(element);
+    const details = {
+      tagName: element.tagName,
+      className: element.className,
+      id: element.id,
+      textContent: element.textContent?.trim(),
+      isVisible
+    };
+    console.log(`[STATUS-DEBUG] Element #${index}:`, details);
+  });
+  
+  // Check for elements with "already" text in them
+  const alreadyElements = Array.from(document.querySelectorAll('*'))
+    .filter(el => el.textContent?.toLowerCase().includes('already'));
+  console.log(`[STATUS-DEBUG] Found ${alreadyElements.length} elements containing "already" text`);
+  
+  // Check for specific Naukri selectors
+  const naukriApplied = document.querySelectorAll(
+    '#already-applied, .already-applied, .styles_already-applied__4KDhw, .styles_jhc__apply-button-container__5Bqnb'
+  );
+  
+  if (naukriApplied.length > 0) {
+    console.log(`[STATUS-DEBUG] Found ${naukriApplied.length} elements matching specific Naukri selectors`);
+    naukriApplied.forEach((element, index) => {
+      const isVisible = isElementVisible(element);
+      const details = {
+        tagName: element.tagName,
+        className: element.className,
+        id: element.id,
+        textContent: element.textContent?.trim(),
+        isVisible,
+        selector: `Element matches specific Naukri selector`,
+        outerHTML: element.outerHTML
+      };
+      console.log(`[STATUS-DEBUG] Naukri Element #${index}:`, details);
+    });
+  } else {
+    console.log(`[STATUS-DEBUG] No elements found matching specific Naukri selectors`);
+  }
+  
+  // Dump elements with "Apply" or "Applied" text
+  const applyElements = Array.from(document.querySelectorAll('button, span, div, a'))
+    .filter(el => {
+      const text = el.textContent?.trim().toLowerCase() || '';
+      return text === 'apply' || text === 'applied';
+    });
+  
+  console.log(`[STATUS-DEBUG] Found ${applyElements.length} elements with exact "Apply" or "Applied" text`);
+  applyElements.forEach((element, index) => {
+    const details = {
+      tagName: element.tagName,
+      className: element.className,
+      id: element.id,
+      textContent: element.textContent?.trim(),
+      isVisible: isElementVisible(element),
+      outerHTML: element.outerHTML
+    };
+    console.log(`[STATUS-DEBUG] Apply Element #${index}:`, details);
+  });
+}

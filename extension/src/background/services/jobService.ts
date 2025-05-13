@@ -7,7 +7,8 @@ import { config } from '../../config';
  */
 export async function getMatchingJobs(profile: UserProfile): Promise<Job[]> {
   try {
-    // Call backend API to get matching jobs
+    console.log('Fetching matching jobs from API:', `${config.apiUrl}/api/matching-jobs`);
+    
     const response = await fetch(`${config.apiUrl}/api/matching-jobs`, {
       method: 'POST',
       headers: {
@@ -17,11 +18,14 @@ export async function getMatchingJobs(profile: UserProfile): Promise<Job[]> {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch matching jobs: ${response.statusText}`);
+      console.error('Backend API error:', response.status, response.statusText);
+      throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
     const jobs: Job[] = data.jobs;
+    
+    console.log(`Received ${jobs.length} jobs from backend API`);
     
     // Get existing saved jobs to preserve application status
     const storage = await chrome.storage.local.get('savedJobs');
@@ -42,6 +46,6 @@ export async function getMatchingJobs(profile: UserProfile): Promise<Job[]> {
     return mergedJobs;
   } catch (error) {
     console.error('Error fetching matching jobs:', error);
-    throw error;
+    return [];
   }
-}
+} 

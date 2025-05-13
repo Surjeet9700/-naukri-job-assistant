@@ -9,7 +9,7 @@ interface Step {
 
 const steps: Step[] = [
   {
-    id: ApplicationStatus.NOT_STARTED,
+    id: ApplicationStatus.NOT_APPLIED,
     label: 'Not Started',
     description: 'Application process not initiated'
   },
@@ -27,6 +27,11 @@ const steps: Step[] = [
     id: ApplicationStatus.FAILED,
     label: 'Failed',
     description: 'Application process encountered an error'
+  },
+  {
+    id: ApplicationStatus.UNKNOWN,
+    label: 'Unknown',
+    description: 'Application status unclear, please check manually'
   }
 ];
 

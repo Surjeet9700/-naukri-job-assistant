@@ -11,6 +11,7 @@ interface ProfileInputProps {
 const ProfileInput: React.FC<ProfileInputProps> = ({ onProfileSubmit, loading }) => {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [parsingStatus, setParsingStatus] = useState<'idle' | 'parsing' | 'done' | 'error'>('idle');
+  const [parseError, setParseError] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile>({
     name: '',
     email: '',
@@ -25,20 +26,53 @@ const ProfileInput: React.FC<ProfileInputProps> = ({ onProfileSubmit, loading })
     if (e.target.files && e.target.files[0]) {
       setResumeFile(e.target.files[0]);
       setParsingStatus('idle');
+      setParseError(null);
     }
   };
 
   const handleParseResume = async () => {
-    if (!resumeFile) return;
+    if (!resumeFile) {
+      setParseError("Please select a resume file first");
+      return;
+    }
     
     setParsingStatus('parsing');
+    setParseError(null);
+    
     try {
+      console.log(`Parsing resume file: ${resumeFile.name} (${resumeFile.type})`);
       const parsedProfile = await parseResume(resumeFile);
+      
+      console.log("Resume parsed successfully:", parsedProfile);
+      
+      if (!parsedProfile || !parsedProfile.name) {
+        throw new Error("Failed to extract information from resume");
+      }
+      
+      // Update the profile state with the parsed data
       setProfile(parsedProfile);
       setParsingStatus('done');
-    } catch (error) {
+      
+      // Pre-fill the form fields with parsed data
+      // This is optional but provides better UX
+      document.getElementById('name')?.setAttribute('value', parsedProfile.name || '');
+      document.getElementById('email')?.setAttribute('value', parsedProfile.email || '');
+      document.getElementById('phone')?.setAttribute('value', parsedProfile.phone || '');
+      
+      // For skills we need to join them as they're in an array
+      if (parsedProfile.skills && parsedProfile.skills.length > 0) {
+        document.getElementById('skills')?.setAttribute('value', parsedProfile.skills.join(', '));
+      }
+      
+      // For textarea we need to set innerText
+      const summaryElement = document.getElementById('summary') as HTMLTextAreaElement;
+      if (summaryElement && parsedProfile.summary) {
+        summaryElement.value = parsedProfile.summary;
+      }
+    } catch (error: any) {
       console.error('Error parsing resume:', error);
       setParsingStatus('error');
+      setParseError(error.message || "Failed to parse resume");
     }
   };
 
@@ -48,13 +82,29 @@ const ProfileInput: React.FC<ProfileInputProps> = ({ onProfileSubmit, loading })
   };
 
   const handleSkillsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const skills = e.target.value.split(',').map(skill => skill.trim());
+    const skills = e.target.value.split(',').map(skill => skill.trim()).filter(skill => skill);
     setProfile(prev => ({ ...prev, skills }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onProfileSubmit(profile);
+    
+    // Final validation
+    if (!profile.name || !profile.email) {
+      setParseError("Name and email are required");
+      return;
+    }
+    
+    // If we have a resume file, attach it to the profile
+    if (resumeFile) {
+      const profileWithResume = {
+        ...profile,
+        resumeFile: resumeFile // This will be used by background script for further processing
+      };
+      onProfileSubmit(profileWithResume);
+    } else {
+      onProfileSubmit(profile);
+    }
   };
 
   return (
@@ -102,11 +152,13 @@ const ProfileInput: React.FC<ProfileInputProps> = ({ onProfileSubmit, loading })
           )}
           
           {parsingStatus === 'done' && (
-            <div className="mt-2 text-sm text-green-600">Resume parsed successfully!</div>
+            <div className="mt-2 text-sm text-green-600">Resume parsed successfully! Please review the information below.</div>
           )}
           
           {parsingStatus === 'error' && (
-            <div className="mt-2 text-sm text-red-600">Error parsing resume. Please try again.</div>
+            <div className="mt-2 text-sm text-red-600">
+              {parseError || "Error parsing resume. Please try again or fill in details manually."}
+            </div>
           )}
         </div>
       </div>

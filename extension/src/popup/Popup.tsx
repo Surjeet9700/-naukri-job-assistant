@@ -7,8 +7,6 @@ import { UserProfile } from './types/profile';
 import { Job, ApplicationStatus } from './types/job';
 import { fetchMatchingJobs, applyToJob, getSavedJobs } from './services/jobService';
 import './Popup.css';
-import StatusBar from './components/StatusBar';
-import ErrorBanner from './components/ErrorBanner';
 import ProfileCard from './components/ProfileCard';
 
 const Popup: React.FC = () => {
@@ -53,7 +51,7 @@ const Popup: React.FC = () => {
         
         // Check if any job status has changed
         const hasChanges = jobs.some(job => {
-          const savedJob = savedJobs.find(j => j.id === job.id);
+          const savedJob = savedJobs.find((j: Job) => j.id === job.id);
           return savedJob && savedJob.applicationStatus !== job.applicationStatus;
         });
         
@@ -64,7 +62,7 @@ const Popup: React.FC = () => {
           
           // If a job was in progress and now failed, clear the applying state
           if (applyingJobId) {
-            const appliedJob = savedJobs.find(j => j.id === applyingJobId);
+            const appliedJob = savedJobs.find((j: Job) => j.id === applyingJobId);
             if (appliedJob && appliedJob.applicationStatus === ApplicationStatus.FAILED) {
               setApplyingJobId(null);
             }
@@ -211,8 +209,6 @@ const Popup: React.FC = () => {
   return (
     <div className="popup-root">
       {/* Status and error at the top */}
-      <StatusBar status={status} loading={loading || !!applyingJobId} />
-      {error && <ErrorBanner message={error} type="error" onClose={() => setError(null)} />}
       <div className="w-[400px] min-h-[500px] p-4 bg-gray-50">
         <header className="flex justify-between items-center mb-4">
           <div className="flex items-center">

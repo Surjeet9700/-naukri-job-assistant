@@ -25,4 +25,18 @@ export interface UserProfile {
   education: Education[];
   summary: string;
   resumeUrl?: string;
+  noticePeriod?: string;
+  expectedCtc?: string;
+  currentCtc?: string;
+  totalYearsOfExperience?: number;
+  immediateJoiner?: boolean;
+  currentCompany?: string;
+  technicalSkills?: string[];
+  projects?: {
+    name: string;
+    description?: string;
+    technologies?: string[];
+    responsibilities?: string[];
+    outcome?: string;
+  }[];
 }

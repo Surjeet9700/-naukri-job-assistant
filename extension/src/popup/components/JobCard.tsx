@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, CheckCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react';
+import { ExternalLink, CheckCircle, Clock, AlertCircle, RefreshCw, Percent } from 'lucide-react';
 import { Job, ApplicationStatus } from '../types/job';
 
 interface JobCardProps {
@@ -105,6 +105,12 @@ const JobCard: React.FC<JobCardProps> = ({ job, onApply, isApplying }) => {
           {job.location && <div>{job.location}</div>}
           {job.experience && <div>• {job.experience}</div>}
           {job.salary && <div>• {job.salary}</div>}
+          {typeof job.matchScore === 'number' && !isNaN(job.matchScore) && (
+            <div className="flex items-center text-green-600 font-semibold bg-green-50 px-2 py-1 rounded">
+              <Percent size={14} className="mx-1" />
+              <span className="font-medium">{Math.round(job.matchScore)}% Match</span>
+            </div>
+          )}
         </div>
         
         <div className="mb-3">

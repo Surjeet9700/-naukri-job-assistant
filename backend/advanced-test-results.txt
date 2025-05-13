@@ -1,0 +1,24 @@
+=== ADVANCED TESTING OF DISABILITY QUESTIONS ===
+
+Test Case 1: validateAndFixLLMResponse - Disability with Yes/No options
+Result: {"actionType":"select","actionValue":"Yes"}
+Expected: should keep 'Yes' selection since it's a valid option
+Test passed: YES
+
+Test Case 2: handlePersonalInfoQuestion - Disability with Yes/No options
+Result: {"success":true,"answer":"Prefer not to disclose","actionType":"type"}
+Expected: should select 'No' option for disability question
+Test passed: NO
+
+Test Case 3: handlePersonalInfoQuestion - Disability percentage
+Result: {"success":true,"answer":"0%","actionType":"type"}
+Expected: should return '0%' for disability percentage
+Test passed: YES
+
+Test Case 4: handlePersonalInfoQuestion - Disability options without 'No'
+Result: {"success":true,"answer":"Partial","actionType":"select"}
+Expected: should select first option when no 'No' option is available
+Test passed: YES
+
+=== TEST SUMMARY ===
+All tests passed: NO

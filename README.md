@@ -30,7 +30,7 @@ The project consists of three main components:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/naukri-job-assistant.git
+   git clone https://github.com/Surjeet9700/-naukri-job-assistant.git
    cd naukri-job-assistant
    ```
 

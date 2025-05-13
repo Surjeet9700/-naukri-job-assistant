@@ -2,7 +2,8 @@ export enum ApplicationStatus {
   NOT_APPLIED = 'NOT_APPLIED',
   IN_PROGRESS = 'IN_PROGRESS',
   APPLIED = 'APPLIED',
-  FAILED = 'FAILED'
+  FAILED = 'FAILED',
+  UNKNOWN = 'UNKNOWN'
 }
 
 export interface Job {
@@ -16,8 +17,9 @@ export interface Job {
   salary?: string;
   skills: string[];
   applicationStatus: ApplicationStatus;
-  naukriJobId?: string; // The ID used on Naukri.com
+  naukriJobId?: string; 
   postedDate?: string;
   jobType?: string;
   isInternal: boolean;
+  matchScore?: number; 
 }

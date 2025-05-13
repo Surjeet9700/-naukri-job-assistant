@@ -1,9 +1,23 @@
+/// <reference lib="webworker" />
+
 import { ApplicationStatus, Job } from '../popup/types/job';
 import { UserProfile } from '../popup/types/profile';
 import { parseResumeWithGemini } from './services/geminiService';
 import { getMatchingJobs } from './services/jobService';
 import { startAutomation } from './services/automationService';
 import { config } from '../config';
+
+declare const self: ServiceWorkerGlobalScope;
+
+self.addEventListener('install', (event) => {
+  console.log('Service Worker installing...');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker activated!');
+  self.clients.claim();
+});
 
 // Type definitions for messages
 type MessageAction = 
@@ -27,14 +41,12 @@ interface MessageData {
   resumeData?: ResumeData;
 }
 
-// Define message structure for chrome messaging
 interface ChromeMessage {
   type: string;
   action?: MessageAction;
   data?: MessageData;
 }
 
-// Define response structure for messages
 interface MessageResponse {
   profile?: UserProfile;
   jobs?: Job[];
@@ -43,7 +55,6 @@ interface MessageResponse {
   error?: string;
 }
 
-// Custom error class for application errors
 class ApplicationError extends Error {
   constructor(message: string) {
     super(message);
@@ -51,25 +62,20 @@ class ApplicationError extends Error {
   }
 }
 
-// Constants
 const APPLICATION_TIMEOUT = 1 * 60 * 1000; 
 
-// Store of current job automation state
 let currentJobAutomation: {
   jobId: string;
   status: ApplicationStatus;
   naukriTabId?: number;
 } | null = null;
 
-// Store of automation timeouts
 const automationTimeouts = new Map<string, NodeJS.Timeout>();
 
-// Setup message listeners
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Background received message:', message);
   
-  // Handle API requests from content scripts and popup
-  if (message.type === 'API_REQUEST') {
+  if (message.type === 'API_REQUEST' || message.type === 'api_request') {
     handleApiRequest(message.endpoint, message.method, message.data)
       .then(data => {
         sendResponse({ success: true, data });
@@ -86,7 +92,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Indicates that the response will be sent asynchronously
   }
   
-  // Handle automation requests
+  if (message.type === 'PARSE_RESUME' || message.action === 'parseResume') {
+    console.log('Resume parse request received');
+    parseResumeFile(message.data?.file, message.data?.fileType)
+      .then(result => {
+        console.log('Resume parsed successfully');
+        sendResponse({ success: true, data: result });
+      })
+      .catch(error => {
+        console.error('Resume parsing failed:', error);
+        sendResponse({ 
+          success: false, 
+          error: error.message || 'Failed to parse resume' 
+        });
+      });
+    return true;
+  }
+  
   if (message.type === 'START_AUTOMATION') {
     if (!message.data?.job || !message.data?.profile) {
       sendResponse({ success: false, error: 'Both job and profile are required' });
@@ -99,7 +121,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   
-  // Handle job search requests
   if (message.type === 'JOB_SEARCH') {
     getMatchingJobs(message.query)
       .then(jobs => sendResponse({ success: true, jobs: jobs }))
@@ -107,14 +128,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   
-  // Handle automation status updates
   if (message.type === 'AUTOMATION_STATUS' || message.action === 'automationStatus') {
     handleAutomationStatus(message.data || message.data);
     sendResponse({ success: true });
     return true;
   }
   
-  // Handle specific automation actions (like form filling, clicking buttons)
   if (message.type === 'FORM_ACTION' || message.action === 'formAction') {
     console.log('Received form action request:', message.action, message.data);
     sendResponse({ success: true, message: 'Action received' });
@@ -123,7 +142,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   const handleAsyncMessage = async (): Promise<MessageResponse> => {
     try {
-      // Ensure action is defined before switch statement
       if (!message.action) {
         console.warn('Message received without action property:', message);
         return { 
@@ -175,9 +193,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'fillForm':
         case 'navigateTo':
         case 'selectOption': {
-          // Handle various automation actions
-          // IMPORTANT: All UI actions (Apply/Save/Next/Submit) must be guarded by isChatbotActive and use findSmartSaveButton on the content script side.
-          // Do NOT trigger Apply/Save clicks directly from background; always send a message and let content script guard it.
           console.log(`Handling automation action: ${message.action}`);
           return { success: true, message: `Processed ${message.action}` };
         }
@@ -195,12 +210,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   };
   
-  // Handle asynchronous response
   handleAsyncMessage().then(sendResponse);
-  return true; // Indicates async response
+  return true;
 });
 
-// Handle automation notification from content script
 chrome.runtime.onMessage.addListener((message: { 
   action: string; 
   data: { 
@@ -214,10 +227,8 @@ chrome.runtime.onMessage.addListener((message: {
   }
 });
 
-// Handle tab close during automation
 chrome.tabs.onRemoved.addListener((tabId: number) => {
   if (currentJobAutomation?.naukriTabId === tabId) {
-    // Job application was interrupted by tab close
     updateJobStatus(currentJobAutomation.jobId, ApplicationStatus.FAILED)
       .then(() => {
         currentJobAutomation = null;
@@ -251,14 +262,12 @@ async function handleJobApplication(jobId: string): Promise<MessageResponse> {
     // Start automation
     const naukriTabId = await startAutomation(job, userProfile);
     
-    // Store current automation state
     currentJobAutomation = {
       jobId,
       status: ApplicationStatus.IN_PROGRESS,
       naukriTabId
     };
     
-    // Set timeout for application
     const timeoutId = setTimeout(() => {
       if (currentJobAutomation?.jobId === jobId) {
         updateJobStatus(jobId, ApplicationStatus.FAILED);
@@ -298,7 +307,6 @@ async function updateJobStatus(jobId: string, status: ApplicationStatus): Promis
     
     await chrome.storage.local.set({ savedJobs: updatedJobs });
     
-    // Clean up timeout if exists
     if (status !== ApplicationStatus.IN_PROGRESS) {
       const timeoutId = automationTimeouts.get(jobId);
       if (timeoutId) {
@@ -329,20 +337,42 @@ async function getSavedJobs(): Promise<Job[]> {
  * Handles automation status updates from content script
  */
 function handleAutomationStatus(data: { state: string; jobId: string; message?: string }): void {
+  console.log('[BACKGROUND] Received automation status update:', data);
+  
   if (!currentJobAutomation || currentJobAutomation.jobId !== data.jobId) {
+    console.log('[BACKGROUND] No active automation or job ID mismatch. Current:', 
+                currentJobAutomation?.jobId, 'Received:', data.jobId);
     return;
   }
   
   switch (data.state) {
     case 'completed':
+    case ApplicationStatus.APPLIED:
+      console.log('[BACKGROUND] Setting job status to APPLIED');
       updateJobStatus(data.jobId, ApplicationStatus.APPLIED)
         .then(() => {
           currentJobAutomation = null;
+          
+          // Notify all tabs that the job status has changed
+          chrome.tabs.query({}, (tabs) => {
+            tabs.forEach(tab => {
+              if (tab.id) {
+                chrome.tabs.sendMessage(tab.id, {
+                  action: 'jobStatusChanged',
+                  data: { jobId: data.jobId, status: ApplicationStatus.APPLIED }
+                }).catch(() => {
+                  // Ignore errors from tabs that can't receive messages
+                });
+              }
+            });
+          });
         })
         .catch(console.error);
       break;
       
     case 'failed':
+    case ApplicationStatus.FAILED:
+      console.log('[BACKGROUND] Setting job status to FAILED');
       updateJobStatus(data.jobId, ApplicationStatus.FAILED)
         .then(() => {
           currentJobAutomation = null;
@@ -351,8 +381,17 @@ function handleAutomationStatus(data: { state: string; jobId: string; message?: 
       break;
       
     case 'progress':
-      // Just log progress updates
-      console.log(`Application progress: ${data.message}`);
+    case ApplicationStatus.IN_PROGRESS:
+      console.log(`[BACKGROUND] Application progress: ${data.message}`);
+      break;
+      
+    case ApplicationStatus.UNKNOWN:
+      console.log('[BACKGROUND] Setting job status to UNKNOWN (timed out)');
+      updateJobStatus(data.jobId, ApplicationStatus.UNKNOWN)
+        .then(() => {
+          currentJobAutomation = null;
+        })
+        .catch(console.error);
       break;
   }
 }
@@ -377,6 +416,33 @@ async function handleApiRequest(
   const url = `${normalizedBaseUrl}${normalizedEndpoint}`;
   
   console.log(`Making ${method} request to: ${url}`);
+  
+  if (endpoint.includes('llm-chatbot-action') && data) {
+    console.log('LLM Request Data:', {
+      question: data.question,
+      hasOptions: data.options ? data.options.length : 0,
+      hasProfile: !!data.profile,
+      hasResumeProfile: !!data.resumeProfile
+    });
+    
+    // Ensure resume data is properly included
+    if (data.profile && data.profile.resumeUrl && !data.resumeProfile) {
+      try {
+        // Try to extract resume text if available
+        const resumeText = await extractResumeText(data.profile.resumeUrl);
+        if (resumeText) {
+          // Add raw resume text to the request
+          data.resumeProfile = {
+            ...data.profile,
+            rawText: resumeText
+          };
+          console.log('Added raw resume text to LLM request');
+        }
+      } catch (error) {
+        console.error('Error extracting resume text:', error);
+      }
+    }
+  }
   
   // Configure fetch options
   const options: RequestInit = {
@@ -405,7 +471,19 @@ async function handleApiRequest(
         throw new Error(`Server responded with status: ${response.status}`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      
+      // Log LLM responses for debugging
+      if (endpoint.includes('llm-chatbot-action') && result) {
+        console.log('LLM Response:', {
+          success: result.success,
+          actionType: result.actionType,
+          answer: result.answer,
+          error: result.error
+        });
+      }
+      
+      return result;
     } catch (error) {
       lastError = error;
       retryCount++;
@@ -420,6 +498,151 @@ async function handleApiRequest(
   }
   
   throw lastError || new Error('API request failed after multiple retries');
+}
+
+/**
+ * Helper function to extract text from resume URLs (PDF or other formats)
+ * @param resumeUrl URL to the resume file
+ * @returns Extracted text or null if extraction fails
+ */
+async function extractResumeText(resumeUrl?: string): Promise<string | null> {
+  if (!resumeUrl) return null;
+  
+  try {
+    // For URLs pointing to PDFs, we can extract the text
+    if (resumeUrl.toLowerCase().endsWith('.pdf')) {
+      // Fetch the PDF file
+      const response = await fetch(resumeUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+      }
+      
+      // Get the PDF data as ArrayBuffer
+      const pdfData = await response.arrayBuffer();
+      
+      // Use dynamic import to avoid loading PDF.js unnecessarily
+      const { extractResumeDataFromPdf } = await import('./services/pdfParser');
+      
+      // Extract resume data
+      const resumeData = await extractResumeDataFromPdf(pdfData);
+      
+      console.log('Successfully extracted resume text from PDF');
+      return resumeData.text;
+    }
+    
+    // For other file types, we can use a placeholder message
+    return `[Resume content from ${resumeUrl}]`;
+  } catch (error) {
+    console.error('Failed to extract resume text:', error);
+    return null;
+  }
+}
+
+/**
+ * Parse a resume file and extract structured data
+ */
+async function parseResumeFile(file: any, fileType: string): Promise<any> {
+  try {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+    
+    // Convert file data to appropriate format
+    let fileData: ArrayBuffer;
+    
+    if (file instanceof ArrayBuffer) {
+      fileData = file;
+    } else if (typeof file === 'string') {
+      // If file is a Base64 string, convert it to ArrayBuffer
+      fileData = base64ToArrayBuffer(file);
+    } else {
+      throw new Error('Unsupported file format');
+    }
+    
+    // For PDF files
+    if (fileType === 'application/pdf' || fileType.toLowerCase().includes('pdf')) {
+      const { extractResumeDataFromPdf } = await import('./services/pdfParser');
+      const resumeData = await extractResumeDataFromPdf(fileData);
+      
+      // Send the extracted data to our LLM API for structured parsing
+      const structuredProfile = await sendResumeTextToLLM(resumeData.text);
+      
+      return {
+        ...structuredProfile,
+        rawText: resumeData.text
+      };
+    }
+    
+    // For text files
+    if (fileType === 'text/plain') {
+      const decoder = new TextDecoder('utf-8');
+      const text = decoder.decode(fileData);
+      
+      // Send the text to our LLM API for structured parsing
+      const structuredProfile = await sendResumeTextToLLM(text);
+      
+      return {
+        ...structuredProfile,
+        rawText: text
+      };
+    }
+    
+    throw new Error('Unsupported file type: ' + fileType);
+  } catch (error) {
+    console.error('Error parsing resume file:', error);
+    throw error;
+  }
+}
+
+/**
+ * Convert Base64 string to ArrayBuffer
+ */
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  // Remove data URL prefix if present
+  const base64Data = base64.includes('base64,') 
+    ? base64.split('base64,')[1] 
+    : base64;
+  
+  const binaryString = window.atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  
+  return bytes.buffer;
+}
+
+/**
+ * Send resume text to LLM API for structured parsing
+ */
+async function sendResumeTextToLLM(resumeText: string): Promise<any> {
+  try {
+    const response = await handleApiRequest(
+      'api/parse-resume-text',
+      'POST',
+      { resumeText }
+    );
+    
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to parse resume with LLM');
+    }
+    
+    return response.profile || {};
+  } catch (error) {
+    console.error('Error sending resume text to LLM:', error);
+    
+    // Return basic structure with available text
+    return {
+      name: 'Unknown',
+      email: '',
+      phone: '',
+      summary: resumeText.substring(0, 200) + '...',
+      skills: [],
+      experience: [],
+      education: []
+    };
+  }
 }
 
 // Initialize services when the extension loads

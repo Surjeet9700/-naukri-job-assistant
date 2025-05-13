@@ -152,18 +152,14 @@ async function handleNaukriSpecificQuestions(profile: UserProfile): Promise<void
     const radioButtons = Array.from(container.querySelectorAll('input[type="radio"]'));
     console.log(`Found ${radioButtons.length} radio buttons for question`);
     
-    // If user's location matches the question location, select "Yes"
     if (radioButtons.length >= 2) {
-      // Typically, the first radio button is "Yes" and the second is "No"
       const yesButton = radioButtons[0];
       
-      // For Naukri specifically, always click the Yes radio button for location questions
       await selectRadioOption(yesButton);
       console.log('Selected "Yes" for location question');
     }
   }
   
-  // Notice period questions
   const noticeQuestions = Array.from(document.querySelectorAll('div, p, h3, h4, label, span'))
     .filter(el => {
       const text = el.textContent?.toLowerCase() || '';
@@ -174,13 +170,10 @@ async function handleNaukriSpecificQuestions(profile: UserProfile): Promise<void
     const container = findClosestContainer(questionEl as HTMLElement);
     if (!container) continue;
     
-    // Find dropdown or radio options
     const selects = Array.from(container.querySelectorAll('select'));
     if (selects.length > 0) {
-      // Choose shortest notice period option (typically first option)
       const options = Array.from(selects[0].options);
       if (options.length > 1) {
-        // Select the first non-empty option (usually "Immediate" or shortest duration)
         for (const option of options) {
           if (option.value && option.value !== '') {
             selects[0].value = option.value;
@@ -193,7 +186,6 @@ async function handleNaukriSpecificQuestions(profile: UserProfile): Promise<void
     }
   }
   
-  // Experience questions (years of experience)
   if (profile.experience && profile.experience.length > 0) {
     const expYears = calculateTotalExperienceYears(profile);
     const experienceQuestions = Array.from(document.querySelectorAll('div, p, h3, h4, label, span'))
@@ -206,8 +198,7 @@ async function handleNaukriSpecificQuestions(profile: UserProfile): Promise<void
       const container = findClosestContainer(questionEl as HTMLElement);
       if (!container) continue;
       
-      // Find numeric input fields
-      const inputs = Array.from(container.querySelectorAll('input[type="number"], input[type="text"]'));
+        const inputs = Array.from(container.querySelectorAll('input[type="number"], input[type="text"]'));
       for (const input of inputs) {
         if (input instanceof HTMLInputElement) {
           input.value = expYears.toString();
@@ -226,17 +217,14 @@ async function handleNaukriSpecificQuestions(profile: UserProfile): Promise<void
 async function handleGenericQuestions(profile: UserProfile): Promise<void> {
   console.log('Handling generic questions');
   
-  // Wait for radio buttons to be available
   await waitForElements('input[type="radio"]', 2000);
   
-  // Generic location questions
   const locationTexts = ['currently located', 'current location', 'are you located'];
   const questionContainers = findQuestionContainers(locationTexts);
   
   for (const container of questionContainers) {
     const radioButtons = Array.from(container.querySelectorAll('input[type="radio"]'));
     if (radioButtons.length >= 2) {
-      // Usually first option is Yes/Affirmative
       await selectRadioOption(radioButtons[0]);
     }
   }
@@ -248,7 +236,6 @@ async function handleGenericQuestions(profile: UserProfile): Promise<void> {
   for (const container of relocateContainers) {
     const radioButtons = Array.from(container.querySelectorAll('input[type="radio"]'));
     if (radioButtons.length >= 2) {
-      // Usually first option is Yes/Affirmative
       await selectRadioOption(radioButtons[0]);
     }
   }
@@ -260,7 +247,6 @@ async function handleGenericQuestions(profile: UserProfile): Promise<void> {
   for (const container of workAuthContainers) {
     const radioButtons = Array.from(container.querySelectorAll('input[type="radio"]'));
     if (radioButtons.length >= 2) {
-      // Usually first option is Yes/Affirmative
       await selectRadioOption(radioButtons[0]);
     }
   }
@@ -272,7 +258,6 @@ async function handleGenericQuestions(profile: UserProfile): Promise<void> {
 function findQuestionContainers(searchTexts: string[]): HTMLElement[] {
   const containers: HTMLElement[] = [];
   
-  // Find elements containing the search texts
   for (const text of searchTexts) {
     const elements = Array.from(document.querySelectorAll('div, p, h3, h4, label, span'))
       .filter(el => (el.textContent?.toLowerCase() || '').includes(text));
@@ -292,30 +277,25 @@ function findQuestionContainers(searchTexts: string[]): HTMLElement[] {
  * Find the closest container that might contain form controls
  */
 function findClosestContainer(element: HTMLElement): HTMLElement | null {
-  // Try to find a container that has form controls
   let current: HTMLElement | null = element;
   let depth = 0;
-  const maxDepth = 5; // Prevent infinite loops and too broad searching
+  const maxDepth = 5;
   
   while (current && depth < maxDepth) {
-    // Check if current element contains form controls
     if (current.querySelectorAll('input, select, textarea').length > 0) {
       return current;
     }
     
-    // Move up to parent
-    const parent = current.parentElement;
+    const parent: HTMLElement | null = current.parentElement;
     if (!parent) break;
     current = parent;
     depth++;
   }
   
-  // If we couldn't find a container with form controls,
-  // return the parent that's at most 2 levels up
   current = element;
   depth = 0;
   while (current && depth < 2) {
-    const parent = current.parentElement;
+    const parent: HTMLElement | null = current.parentElement;
     if (!parent) break;
     current = parent;
     depth++;
@@ -348,9 +328,7 @@ function logElementState(element: Element | null, label: string) {
   });
 }
 
-/**
- * Select a radio button option and ensure it's clicked properly (React/Angular/Vue safe)
- */
+
 export async function selectRadioOption(radioElement: Element): Promise<void> {
   console.log('[LOG] Entered selectRadioOption');
   if (!(radioElement instanceof HTMLInputElement)) {
@@ -416,13 +394,11 @@ export async function selectRadioOption(radioElement: Element): Promise<void> {
   } else {
     await fireHumanEvents(radioElement);
   }
-  await randomDelay(200, 400); // Wait a bit after selection
+  await randomDelay(200, 400);
   logElementState(radioElement, 'Radio (after)');
-  // Use smart Save button logic
   const saveBtn = findSmartSaveButton();
   logElementState(saveBtn, 'Save Button (before)');
   if (saveBtn) {
-    // Human-like Save button click
     await fireHumanEvents(saveBtn);
     logElementState(saveBtn, 'Save Button (after)');
     if (saveBtn.classList.contains('disabled') || saveBtn.hasAttribute('disabled')) {
@@ -451,7 +427,7 @@ function calculateTotalExperienceYears(profile: UserProfile): number {
   
   for (const exp of profile.experience) {
     const startDate = new Date(exp.startDate);
-    const endDate = exp.endDate ? new Date(exp.endDate) : new Date(); // Use current date if still employed
+    const endDate = exp.endDate ? new Date(exp.endDate) : new Date();
     
     if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
       const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
@@ -507,8 +483,7 @@ async function sendApiRequestViaBackground<T>(
         }
         
         if (response.success) {
-          // Fix for undefined data issue
-          resolve(response.data as T); // Type assertion to handle possible undefined
+          resolve(response.data as T);
         } else {
           reject(new Error(response.error || 'Unknown error'));
         }
@@ -535,7 +510,7 @@ function findFormFields(fieldType: string): HTMLElement[] {
   
   for (const selector of fieldSelectors) {
     const found = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
-    elements.push(...found.filter(el => el.offsetParent !== null)); // Only visible elements
+    elements.push(...found.filter(el => el.offsetParent !== null));
   }
   
   return elements;
